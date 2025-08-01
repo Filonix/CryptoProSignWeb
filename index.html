@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Массовое подписание файлов с помощью CryptoPro</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --success-color: #27ae60;
+            --border-radius: 6px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        select, input[type="file"], button, .radio-group {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+        .radio-group {
+            border: none;
+            padding: 10px 0;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .radio-option input {
+            margin-right: 10px;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 20px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        select option {
+            padding: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .save-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 20px;
+            background-color: var(--success-color);
+            color: white;
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            transition: var(--transition);
+            text-align: center;
+        }
+
+        .save-link:hover {
+            background-color: #219653;
+            transform: translateY(-2px);
+        }
+
+        #signatureOutput {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: var(--light-color);
+            border-radius: var(--border-radius);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .status.loading {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: var(--border-radius);
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: var(--secondary-color);
+            border-radius: var(--border-radius);
+            width: 0%;
+            transition: width 0.3s ease;
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            line-height: 20px;
+        }
+
+        .file-list {
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 8px 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-name {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 10px;
+        }
+
+        .file-size {
+            color: #777;
+            font-size: 0.9em;
+        }
+
+        .remove-file {
+            color: var(--accent-color);
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab.active {
+            border-bottom: 2px solid var(--secondary-color);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+		
+		.ufo-check-btn {
+			margin-top: 16px;
+			background-color: #2473c6;
+			color: #fff;
+			border: none;
+			padding: 10px 20px;
+			font-size: 1em;
+			border-radius: 6px;
+			cursor: pointer;
+			transition: background 0.2s;
+		}
+
+		.ufo-check-btn:hover {
+			background-color: #174a7e;
+		}
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            select, input[type="file"], button {
+                padding: 10px 12px;
+            }
+        }
+		
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Массовое подписание и проверка файлов с помощью КриптоПро CAdES</h2>
+        
+        <div class="tab-container">
+            <div class="tab active" data-tab="sign">Подписать файлы</div>
+            <div class="tab" data-tab="verify">Проверить подписи</div>
+        </div>
+        
+        <div id="statusArea"></div>
+        
+        <!-- Вкладка для подписания файлов -->
+        <div id="signTab" class="tab-content active">
+            <div class="form-group">
+                <label for="certSelect">Выберите сертификат:</label>
+                <select id="certSelect" disabled>
+                    <option>Загрузка сертификатов...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Тип подписи:</label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="signTypeAttached" name="signType" value="attached" checked>
+                        <label for="signTypeAttached">Присоединенная (файл + подпись в одном файле)</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="signTypeDetached" name="signType" value="detached">
+                        <label for="signTypeDetached">Отсоединенная (подпись в отдельном файле)</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="fileInput">Выберите файлы для подписи:</label>
+                <input type="file" id="fileInput" multiple disabled />
+                <div id="fileList" class="file-list"></div>
+            </div>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            
+            <button id="signButton" onclick="signFiles()" disabled>Подписать файлы</button>
+            
+            <div id="downloadAll" style="display: none; margin-top: 20px;">
+                <button id="downloadAllButton" onclick="downloadAllSignedFiles()" class="save-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: middle; margin-right: 8px;">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                    </svg>
+                    Скачать все подписи
+                </button>
+            </div>
+            
+            <div id="downloadLinks" style="margin-top: 20px;"></div>
+            
+            <pre id="signatureOutput"></pre>
+        </div>
+        
+        <!-- Вкладка для проверки подписей -->
+        <div id="verifyTab" class="tab-content">
+            <div class="form-group">
+                <label for="verifyFileInput">Выберите файлы для проверки:</label>
+                <input type="file" id="verifyFileInput" multiple />
+                <div id="verifyFileList" class="file-list"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="detachedSignatureInput" style="display: none;" id="detachedSignatureLabel">Выберите файлы подписей (для отсоединенных подписей):</label>
+                <input type="file" id="detachedSignatureInput" multiple style="display: none;" />
+                <div id="detachedSignatureFileList" class="file-list" style="display: none;"></div>
+            </div>
+            
+            <button id="verifyButton" onclick="verifySignatures()">Проверить подписи</button>
+            <button onclick="window.open('https://e-trust.gosuslugi.ru/check/sign', '_blank')" type="button" class="ufo-check-btn">
+					Проверить на портале УФО
+			</button>
+
+            <div id="verifyResults" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <!-- Подключение скриптов в правильном порядке -->
+    <script src="jszip.min.js"></script>
+    <script src="cadesplugin_api.js"></script>
+    <script src="sign.js"></script>
+</body>
+</html>
