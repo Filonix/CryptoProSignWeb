@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Массовое подписание файлов с помощью CryptoPro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -254,22 +255,46 @@
         .tab-content.active {
             display: block;
         }
-		
-		.ufo-check-btn {
-			margin-top: 16px;
-			background-color: #2473c6;
-			color: #fff;
-			border: none;
-			padding: 10px 20px;
-			font-size: 1em;
-			border-radius: 6px;
-			cursor: pointer;
-			transition: background 0.2s;
-		}
 
-		.ufo-check-btn:hover {
-			background-color: #174a7e;
-		}
+        #addStampBtn {
+            background-color: #5c6bc0;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        #addStampBtn:hover {
+            background-color: #3f51b5;
+        }
+
+        #addStampBtn:disabled {
+            background-color: #9fa8da;
+            cursor: not-allowed;
+        }
+
+        #addStampBtn i {
+            margin-right: 8px;
+        }
+
+        .ufo-check-btn {
+            margin-top: 16px;
+            background-color: #2473c6;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .ufo-check-btn:hover {
+            background-color: #174a7e;
+        }
 
         @media (max-width: 600px) {
             .container {
@@ -280,7 +305,6 @@
                 padding: 10px 12px;
             }
         }
-		
     </style>
 </head>
 <body>
@@ -323,6 +347,12 @@
                 <div id="fileList" class="file-list"></div>
             </div>
             
+            <div class="form-group">
+                <button id="addStampBtn" onclick="addStampToPDFs()" disabled>
+                    <i class="fas fa-stamp"></i> Добавить штамп на PDF
+                </button>
+            </div>
+            
             <div class="progress-container" id="progressContainer">
                 <div class="progress-bar" id="progressBar">0%</div>
             </div>
@@ -360,14 +390,15 @@
             
             <button id="verifyButton" onclick="verifySignatures()">Проверить подписи</button>
             <button onclick="window.open('https://e-trust.gosuslugi.ru/check/sign', '_blank')" type="button" class="ufo-check-btn">
-					Проверить на портале УФО
-			</button>
+                Проверить на портале УФО
+            </button>
 
             <div id="verifyResults" style="margin-top: 20px;"></div>
         </div>
     </div>
 
     <!-- Подключение скриптов в правильном порядке -->
+    <script src="pdf-lib.min.js"></script>
     <script src="jszip.min.js"></script>
     <script src="cadesplugin_api.js"></script>
     <script src="sign.js"></script>

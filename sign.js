@@ -1,9 +1,10 @@
 // Глобальные переменные
-let cadespluginLoaded = false;
-let selectedFiles = [];
-let signedFiles = [];
-let verifyFiles = [];
-let detachedSignatures = [];
+let cadespluginLoaded = false; 
+let selectedFiles = []; 
+let signedFiles = []; 
+let verifyFiles = []; 
+let detachedSignatures = []; 
+let certificates = [];
 
 // Функция для отображения статуса
 function showStatus(message, type = 'info') {
@@ -36,6 +37,12 @@ async function initCadesPlugin() {
     }
 }
 
+// Форматирование даты
+function formatDate(dateInput) {
+    const d = new Date(dateInput);
+    return d.toLocaleDateString('ru-RU');
+}
+
 // Функция для обновления списка файлов
 function updateFileList() {
     const fileList = document.getElementById('fileList');
@@ -54,7 +61,17 @@ function updateFileList() {
         
         const fileName = document.createElement('span');
         fileName.className = 'file-name';
-        fileName.textContent = file.name;
+        
+        // Добавляем иконку для PDF
+        if (file.type === 'application/pdf') {
+            const pdfIcon = document.createElement('i');
+            pdfIcon.className = 'fas fa-file-pdf';
+            pdfIcon.style.color = '#e74c3c';
+            pdfIcon.style.marginRight = '5px';
+            fileName.appendChild(pdfIcon);
+        }
+        
+        fileName.appendChild(document.createTextNode(file.name));
         
         const fileSize = document.createElement('span');
         fileSize.className = 'file-size';
@@ -176,6 +193,184 @@ function removeVerifyFile(index) {
 function removeDetachedSignature(index) {
     detachedSignatures.splice(index, 1);
     updateDetachedSignatureList();
+}
+
+// Получение деталей сертификата по индексу
+async function getCertificateDetails(index) {
+    const oStore = await cadesplugin.CreateObjectAsync("CAPICOM.Store");
+    await oStore.Open(
+        cadesplugin.CAPICOM_CURRENT_USER_STORE,
+        cadesplugin.CAPICOM_MY_STORE,
+        cadesplugin.CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED
+    );
+    
+    const certs = await oStore.Certificates;
+    const cert = await certs.Item(index);
+    
+    return {
+        commonName: await cert.SubjectName,
+        serialNumber: await cert.SerialNumber,
+        validFrom: await cert.ValidFromDate,
+        validTo: await cert.ValidToDate
+    };
+}
+
+// Вспомогательная функция — извлечь только CN из полного SubjectName
+function extractCN(dn) {
+  if (typeof dn !== 'string') {
+    console.warn('extractCN: передан не строковый DN:', dn);
+    return '';
+  }
+  const match = dn.match(/CN=([^,]+)/i);
+  return match ? match[1].trim() : dn;
+}
+
+// Функция для отображения статуса
+function showStatus(message, type = 'info') { 
+    const statusArea = document.getElementById('statusArea'); 
+    if (!statusArea) return; 
+    statusArea.innerHTML = `<div class="status ${type}">${message}</div>`;
+}
+
+// Форматирование даты для штампа
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+}
+
+// Создание изображения штампа
+async function createStampImage(certInfo) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Жёстко берём CN из certInfo.subjectName
+    const ownerCN = extractCN(certInfo.commonName);
+
+    const title = "ПОДПИСАНО ЭЛЕКТРОННОЙ ПОДПИСЬЮ";
+    const lines = [
+        `Владелец: ${ownerCN}`,
+        `Серийный номер: ${certInfo.serialNumber}`,
+        `Действителен: с ${formatDate(certInfo.validFrom)} по ${formatDate(certInfo.validTo)}`
+    ];
+
+    // Шрифты и отступы
+    const padding = 10;
+    const titleFont = "bold 14px Arial";
+    const lineFont  = "12px Arial";
+    const lineHeight = 18;
+
+    ctx.font = titleFont;
+    const titleWidth = ctx.measureText(title).width;
+
+    ctx.font = lineFont;
+    let maxWidth = titleWidth;
+    for (let line of lines) {
+        const w = ctx.measureText(line).width;
+        if (w > maxWidth) maxWidth = w;
+    }
+
+    canvas.width  = Math.ceil(maxWidth + padding * 2);
+    canvas.height = Math.ceil(lineHeight * (lines.length + 1) + padding * 2);
+
+    // Рисуем фон и границу
+    ctx.fillStyle   = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth   = 1;
+    ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+
+    // Рисуем заголовок
+    ctx.fillStyle = "black";
+    ctx.font      = titleFont;
+    ctx.textBaseline = "top";
+    ctx.fillText(title, padding, padding);
+
+    // Рисуем строки
+    ctx.font = lineFont;
+    for (let i = 0; i < lines.length; i++) {
+        const y = padding + lineHeight * (i + 1);
+        ctx.fillText(lines[i], padding, y);
+    }
+
+    // Возвращаем PNG Blob
+    return new Promise(resolve => {
+        canvas.toBlob(blob => resolve(blob), "image/png");
+    });
+}
+
+// Добавление штампа в PDF
+async function addStampToPDF(pdfBytes, stampBlob) {
+    const { PDFDocument } = PDFLib;
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    
+    // Загружаем изображение штампа
+    const stampImage = await pdfDoc.embedPng(await stampBlob.arrayBuffer());
+    const { width, height } = stampImage.scale(0.5);
+    
+    // Позиционирование (центр внизу)
+    const x = (lastPage.getWidth() - width) / 2;
+    const y = 50;
+    
+    lastPage.drawImage(stampImage, {
+        x,
+        y,
+        width,
+        height,
+    });
+    
+    return await pdfDoc.save();
+}
+
+// Добавление штампа ко всем PDF
+async function addStampToPDFs() {
+    if (!cadespluginLoaded) {
+        showStatus('Плагин не загружен', 'error');
+        return;
+    }
+    
+    const certSelect = document.getElementById('certSelect');
+    if (certSelect.selectedIndex < 1) {
+        showStatus('Выберите сертификат', 'error');
+        return;
+    }
+    
+    try {
+        showStatus('Добавление штампа...', 'loading');
+        
+        // Получаем информацию о сертификате
+        const certIndex = parseInt(certSelect.value);
+        const cert = await getCertificateDetails(certIndex);
+        
+        // Создаем изображение штампа
+        const stampBlob = await createStampImage(cert);
+        
+        // Обрабатываем все PDF
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            
+            if (file.type === 'application/pdf') {
+                const arrayBuffer = await readFileAsArrayBuffer(file);
+                const stampedPdf = await addStampToPDF(arrayBuffer, stampBlob);
+                
+                // Заменяем файл в списке
+                selectedFiles[i] = new File([stampedPdf], file.name, {
+                    type: file.type,
+                    lastModified: new Date()
+                });
+            }
+        }
+        
+        showStatus('Штамп добавлен на все PDF!', 'success');
+        updateFileList();
+    } catch (err) {
+        console.error('Ошибка добавления штампа:', err);
+        showStatus(`Ошибка: ${err.message}`, 'error');
+    }
 }
 
 // Подписание файлов
@@ -473,12 +668,10 @@ function downloadAllSignedFiles() {
 // Загрузка сертификатов
 async function loadCertificates() {
     const certSelect = document.getElementById('certSelect');
-    
     try {
         showStatus('Загрузка сертификатов...', 'loading');
-
         if (!cadespluginLoaded) {
-            certSelect.innerHTML = '<option disabled>Плагин КриптоПро не загружен</option>';
+            certSelect.innerHTML = '<option value="">Плагин не загружен</option>';
             showStatus('Плагин КриптоПро не загружен', 'error');
             return;
         }
@@ -492,8 +685,8 @@ async function loadCertificates() {
 
         const certs = await oStore.Certificates;
         const certCount = await certs.Count;
-
-        certSelect.innerHTML = '<option disabled selected>Выберите сертификат</option>';
+        
+        certSelect.innerHTML = '<option value="">Выберите сертификат</option>';
 
         if (certCount === 0) {
             certSelect.add(new Option("Нет доступных сертификатов", "", true, true));
@@ -502,6 +695,8 @@ async function loadCertificates() {
         }
 
         let hasValidCerts = false;
+        certificates = []; // Очищаем массив сертификатов
+
         for (let i = 1; i <= certCount; i++) {
             try {
                 const cert = await certs.Item(i);
@@ -511,11 +706,31 @@ async function loadCertificates() {
                 const subject = await cert.SubjectName;
                 const issuer = await cert.IssuerName;
                 const validTo = await cert.ValidToDate;
+                const validFrom = await cert.ValidFromDate;
+                const serial = await cert.SerialNumber;
 
+                // ИЗМЕНЕНИЕ: Извлекаем только CN для отображения
+                const ownerName = extractCN(subject);
+                const issuerName = extractCN(issuer);
+
+                // Сохраняем информацию о сертификате
+                certificates.push({
+                    index: i,
+                    subjectName: subject,        // Полное имя для технических нужд
+                    ownerName: ownerName,        // НОВОЕ: Только CN для отображения
+                    issuerName: issuer,
+                    issuerDisplayName: issuerName, // НОВОЕ: Только CN издателя для отображения
+                    validFrom: validFrom,
+                    validTo: validTo,
+                    serialNumber: serial
+                });
+
+                // ИЗМЕНЕНИЕ: Используем только CN в выпадающем списке
                 certSelect.add(new Option(
-                    `${subject} | Выдан: ${issuer} | До: ${validTo}`,
+                    `${ownerName} | Издатель: ${issuerName} | До: ${validTo}`,
                     i
                 ));
+
                 hasValidCerts = true;
             } catch (err) {
                 console.error(`Ошибка обработки сертификата ${i}:`, err);
@@ -529,12 +744,12 @@ async function loadCertificates() {
             certSelect.disabled = false;
             document.getElementById('fileInput').disabled = false;
             document.getElementById('signButton').disabled = false;
+            document.getElementById('addStampBtn').disabled = false;
             showStatus('Сертификаты успешно загружены', 'success');
         }
-
     } catch (err) {
         console.error('Ошибка загрузки сертификатов:', err);
-        certSelect.innerHTML = '<option disabled selected>Ошибка загрузки сертификатов</option>';
+        certSelect.innerHTML = '<option value="">Ошибка загрузки</option>';
         showStatus(`Ошибка загрузки сертификатов: ${err.message || err}`, 'error');
     }
 }
