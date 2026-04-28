@@ -306,17 +306,20 @@ async function addStampToPDF(pdfBytes, stampBlob) {
     const { PDFDocument } = PDFLib;
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const pages = pdfDoc.getPages();
-    const lastPage = pages[pages.length - 1];
+    
+    // ИЗМЕНЕНИЕ ЗДЕСЬ: Берем первую страницу (индекс 0) вместо последней
+    const firstPage = pages[0]; 
     
     // Загружаем изображение штампа
     const stampImage = await pdfDoc.embedPng(await stampBlob.arrayBuffer());
     const { width, height } = stampImage.scale(0.5);
     
-    // Позиционирование (центр внизу)
-    const x = (lastPage.getWidth() - width) / 2;
+    // Позиционирование (центр внизу) - используем размеры первой страницы
+    const x = (firstPage.getWidth() - width) / 2;
     const y = 50;
     
-    lastPage.drawImage(stampImage, {
+    // Рисуем штамп на первой странице
+    firstPage.drawImage(stampImage, {
         x,
         y,
         width,
